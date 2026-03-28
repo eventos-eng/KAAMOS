@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kaam OS — Nagar Palika</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #F5F3EE; --surface: #FFFFFF; --surface2: #F0EDE6;
+  --border: #E2DDD4; --text-primary: #1A1612; --text-secondary: #6B6458;
+  --text-muted: #9B9186; --accent: #2D6A4F; --accent-light: #D8EDDF;
+  --accent-text: #1B4332; --amber: #E76F00; --amber-light: #FEF3C7;
+  --amber-text: #92400E; --red: #C0392B; --red-light: #FEE2E2;
+  --red-text: #7F1D1D; --tg: #0088cc; --tg-dark: #006699;
+  --radius: 16px; --radius-sm: 10px;
+}
+body { font-family: 'Plus Jakarta Sans', sans-serif; background: #DDD9D0; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+.app-shell { width: 375px; height: 100vh; background: var(--bg); position: relative; display: flex; flex-direction: column; overflow: hidden; }
+.screen { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+.screen.active { display: flex; }
+.status-bar { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px 4px; font-size: 12px; font-weight: 600; color: var(--text-secondary); background: var(--surface); flex-shrink: 0; }
+.toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: #1A1612; color: white; padding: 12px 20px; border-radius: 12px; font-size: 13px; font-weight: 600; z-index: 999; opacity: 0; transition: opacity .3s; white-space: nowrap; pointer-events: none; }
+.toast.show { opacity: 1; }
+.loading-overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.85); display: none; align-items: center; justify-content: center; z-index: 998; }
+.loading-overlay.show { display: flex; }
+.spinner { width: 36px; height: 36px; border: 3px solid var(--accent-light); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* SPLASH */
+.splash { background: linear-gradient(160deg, #1B4332 0%, #2D6A4F 50%, #40916C 100%); flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px 32px; position: relative; overflow: hidden; }
+.splash::before { content: ''; position: absolute; width: 300px; height: 300px; border-radius: 50%; background: rgba(255,255,255,0.04); top: -80px; right: -80px; }
+.splash-emblem { width: 80px; height: 80px; background: rgba(255,255,255,0.15); border-radius: 24px; display: flex; align-items: center; justify-content: center; margin-bottom: 24px; border: 1px solid rgba(255,255,255,0.2); }
+.splash-emblem svg { width: 44px; height: 44px; }
+.splash-org { font-size: 11px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; color: rgba(255,255,255,0.6); margin-bottom: 8px; }
+.splash-name { font-size: 32px; font-weight: 800; color: #fff; text-align: center; margin-bottom: 6px; }
+.splash-sub { font-size: 13px; color: rgba(255,255,255,0.65); text-align: center; margin-bottom: 20px; line-height: 1.5; }
+.splash-hindi { font-family: 'Noto Sans Devanagari', sans-serif; font-size: 15px; color: rgba(255,255,255,0.5); margin-bottom: 40px; text-align: center; }
+.splash-footer { position: absolute; bottom: 32px; font-size: 10px; color: rgba(255,255,255,0.3); }
+.btn-primary { width: 100%; padding: 16px; background: #fff; color: var(--accent-text); border: none; border-radius: 14px; font-size: 15px; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif; cursor: pointer; }
+.btn-ghost { width: 100%; padding: 14px; background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.8); border: 1px solid rgba(255,255,255,0.2); border-radius: 14px; font-size: 14px; font-weight: 600; font-family: 'Plus Jakarta Sans', sans-serif; cursor: pointer; margin-top: 10px; }
+.btn-accent { width: 100%; padding: 16px; background: var(--accent); color: white; border: none; border-radius: 14px; font-size: 15px; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif; cursor: pointer; margin-bottom: 12px; }
+.btn-green { width: 100%; padding: 16px; background: var(--accent); color: white; border: none; border-radius: 14px; font-size: 15px; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.btn-green:disabled { opacity: .6; cursor: not-allowed; }
+.btn-full { width: 100%; padding: 15px; background: var(--accent); color: white; border: none; border-radius: 14px; font-size: 15px; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.btn-tg { width: 100%; padding: 14px; background: #E8F4FD; color: var(--tg-dark); border: 1.5px solid #B3D9F2; border-radius: 14px; font-size: 14px; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px; }
+
+/* LOGIN */
+.login-screen { flex: 1; display: flex; flex-direction: column; padding: 24px 24px 40px; background: var(--bg); overflow-y: auto; }
+.back-btn { width: 36px; height: 36px; background: var(--surface); border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1px solid var(--border); margin-bottom: 32px; flex-shrink: 0; font-size: 16px; color: var(--text-secondary); }
+.login-heading { font-size: 26px; font-weight: 800; color: var(--text-primary); margin-bottom: 6px; }
+.login-sub { font-size: 14px; color: var(--text-secondary); margin-bottom: 32px; }
+.form-label { font-size: 12px; font-weight: 700; color: var(--text-secondary); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 8px; }
+.form-input { width: 100%; padding: 14px 16px; background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 15px; color: var(--text-primary); font-family: 'Plus Jakarta Sans', sans-serif; margin-bottom: 16px; outline: none; }
+.form-input:focus { border-color: var(--accent); }
+.form-select { width: 100%; padding: 14px 16px; background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 15px; color: var(--text-primary); font-family: 'Plus Jakarta Sans', sans-serif; outline: none; cursor: pointer; }
+.form-select:focus { border-color: var(--accent); }
+.role-select { display: flex; gap: 10px; margin-bottom: 20px; }
+.role-chip { flex: 1; padding: 12px 8px; border-radius: 12px; border: 1.5px solid var(--border); text-align: center; font-size: 13px; font-weight: 600; color: var(--text-secondary); cursor: pointer; background: var(--surface); }
+.role-chip.active { border-color: var(--accent); background: var(--accent-light); color: var(--accent-text); }
+.role-icon { font-size: 20px; margin-bottom: 4px; }
+.divider { display: flex; align-items: center; gap: 12px; margin: 16px 0; }
+.divider-line { flex: 1; height: 1px; background: var(--border); }
+.divider-text { font-size: 12px; color: var(--text-muted); }
+.otp-input { width: 100%; padding: 14px 16px; background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 28px; font-weight: 700; color: var(--text-primary); font-family: 'Plus Jakarta Sans', sans-serif; outline: none; text-align: center; letter-spacing: 12px; margin-bottom: 16px; }
+.otp-input:focus { border-color: var(--accent); }
+
+/* DASHBOARD */
+.dashboard { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.dash-header { padding: 16px 20px 12px; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.dash-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+.dash-org { font-size: 11px; font-weight: 700; color: var(--text-muted); letter-spacing: .08em; text-transform: uppercase; }
+.dash-title { font-size: 20px; font-weight: 800; color: var(--text-primary); }
+.dash-date { font-size: 12px; color: var(--text-secondary); margin-top: 1px; }
+.avatar-btn { width: 40px; height: 40px; background: var(--accent); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-size: 14px; font-weight: 700; cursor: pointer; }
+.stats-row { display: flex; gap: 8px; }
+.stat-chip { flex: 1; padding: 10px 12px; background: var(--surface2); border-radius: 10px; text-align: center; cursor: pointer; }
+.stat-num { font-size: 20px; font-weight: 800; color: var(--text-primary); }
+.stat-label { font-size: 10px; font-weight: 600; color: var(--text-muted); letter-spacing: .05em; text-transform: uppercase; }
+.stat-chip.green .stat-num { color: var(--accent); }
+.stat-chip.amber .stat-num { color: var(--amber); }
+.stat-chip.red .stat-num { color: var(--red); }
+.dash-body { flex: 1; overflow-y: auto; padding: 16px 20px 80px; display: flex; flex-direction: column; gap: 20px; }
+.dash-body::-webkit-scrollbar { width: 0; }
+.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.section-title { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+.section-action { font-size: 12px; font-weight: 600; color: var(--accent); cursor: pointer; }
+.announcement { background: var(--amber-light); border: 1px solid #FCD34D; border-radius: var(--radius-sm); padding: 12px 14px; display: flex; gap: 10px; }
+.ann-icon { font-size: 16px; flex-shrink: 0; }
+.ann-text { font-size: 13px; font-weight: 500; color: var(--amber-text); line-height: 1.4; }
+.ann-time { font-size: 11px; color: #B45309; margin-top: 2px; }
+.worker-list { display: flex; flex-direction: column; gap: 8px; }
+.worker-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; display: flex; align-items: center; gap: 12px; cursor: pointer; }
+.worker-avatar { width: 40px; height: 40px; border-radius: 12px; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; color: var(--text-secondary); flex-shrink: 0; position: relative; }
+.online-dot { width: 10px; height: 10px; border-radius: 50%; position: absolute; bottom: -2px; right: -2px; border: 2px solid white; }
+.online-dot.done { background: var(--accent); }
+.online-dot.pending { background: var(--amber); }
+.online-dot.idle { background: #CBD5E1; }
+.worker-info { flex: 1; min-width: 0; }
+.worker-name { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.worker-zone { font-size: 12px; color: var(--text-muted); }
+.worker-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.status-pill { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
+.pill-done { background: var(--accent-light); color: var(--accent-text); }
+.pill-pending { background: var(--amber-light); color: var(--amber-text); }
+.pill-notstarted { background: #F1F5F9; color: #64748B; }
+.pill-critical { background: var(--red-light); color: var(--red-text); }
+.tg-badge { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--tg-dark); font-weight: 600; }
+.tg-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--tg); }
+
+/* FAB + NAV */
+.fab { position: absolute; bottom: 72px; right: 20px; width: 54px; height: 54px; background: var(--accent); border-radius: 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(45,106,79,0.4); cursor: pointer; z-index: 10; }
+.bottom-nav { position: absolute; bottom: 0; left: 0; right: 0; height: 64px; background: var(--surface); border-top: 1px solid var(--border); display: flex; align-items: center; z-index: 10; }
+.nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; font-weight: 600; color: var(--text-muted); cursor: pointer; padding-bottom: 4px; }
+.nav-item.active { color: var(--accent); }
+.nav-icon { font-size: 20px; }
+
+/* TOP BAR */
+.top-bar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 20px 14px; flex-shrink: 0; }
+.top-bar-row { display: flex; align-items: center; gap: 10px; }
+.top-title { font-size: 18px; font-weight: 800; color: var(--text-primary); }
+.top-sub { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+.back-btn-sm { width: 34px; height: 34px; background: var(--surface2); border-radius: 10px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 14px; cursor: pointer; flex-shrink: 0; color: var(--text-secondary); }
+
+/* SCROLL BODY */
+.scrollbody { flex: 1; overflow-y: auto; padding: 14px 18px 80px; display: flex; flex-direction: column; gap: 14px; }
+.scrollbody::-webkit-scrollbar { width: 0; }
+
+/* FILTER */
+.filter-bar { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+.filter-bar::-webkit-scrollbar { height: 0; }
+.filter-chip { padding: 7px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; border: 1.5px solid var(--border); color: var(--text-secondary); background: var(--surface); white-space: nowrap; cursor: pointer; flex-shrink: 0; }
+.filter-chip.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+/* TASK CARD */
+.task-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; cursor: pointer; }
+.task-card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+.task-card-title { font-size: 14px; font-weight: 700; color: var(--text-primary); line-height: 1.3; max-width: 200px; }
+.task-card-meta { display: flex; align-items: center; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+.zone-chip { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; background: #DBEAFE; color: #1E3A8A; }
+.mini-avatar { width: 22px; height: 22px; border-radius: 6px; background: var(--accent-light); display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 800; color: var(--accent-text); }
+.task-card-bottom { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 10px; margin-top: 8px; }
+.task-time { font-size: 11px; color: var(--text-muted); }
+.tg-reply { display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: var(--tg-dark); }
+.tg-dot-sm { width: 6px; height: 6px; border-radius: 50%; background: var(--tg); }
+.no-reply { font-size: 11px; color: var(--text-muted); }
+.task-card.critical { border-left: 3px solid var(--red); }
+
+/* TG PREVIEW */
+.tg-preview-box { background: #E8F4FD; border: 1px solid #B3D9F2; border-radius: var(--radius); padding: 14px 16px; }
+.tg-preview-header { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--tg-dark); margin-bottom: 10px; }
+.tg-bubble { background: white; border-radius: 0 12px 12px 12px; padding: 10px 14px; font-size: 13px; color: #1A1A1A; line-height: 1.6; box-shadow: 0 1px 2px rgba(0,0,0,0.1); margin-bottom: 6px; }
+.tg-meta { font-size: 11px; color: var(--tg-dark); text-align: right; }
+
+/* TEAM */
+.worker-card-full { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; display: flex; align-items: center; gap: 12px; cursor: pointer; }
+.worker-avatar-lg { width: 44px; height: 44px; border-radius: 13px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px; flex-shrink: 0; position: relative; }
+
+/* BROADCAST */
+.audience-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.audience-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius); padding: 14px; cursor: pointer; text-align: center; }
+.audience-card.selected { border-color: var(--accent); background: var(--accent-light); }
+.audience-icon { font-size: 24px; margin-bottom: 6px; }
+.audience-label { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+.audience-count { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.message-box { background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius); padding: 14px; }
+.message-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+.message-textarea { width: 100%; min-height: 90px; border: none; outline: none; resize: none; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 14px; color: var(--text-primary); background: transparent; line-height: 1.6; }
+.quick-template { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+.quick-template::-webkit-scrollbar { height: 0; }
+.tmpl-chip { padding: 7px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; border: 1.5px solid var(--border); color: var(--text-secondary); background: var(--surface); white-space: nowrap; cursor: pointer; flex-shrink: 0; }
+
+/* MODAL */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; align-items: flex-end; justify-content: center; z-index: 100; }
+.modal-overlay.show { display: flex; }
+.modal { background: var(--surface); border-radius: 24px 24px 0 0; padding: 24px; width: 375px; max-height: 85vh; overflow-y: auto; }
+.modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 20px; }
+.modal-title { font-size: 18px; font-weight: 800; color: var(--text-primary); margin-bottom: 4px; }
+.modal-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
+.form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+<div class="loading-overlay" id="loader"><div class="spinner"></div></div>
+
+<!-- ADD WORKER MODAL -->
+<div class="modal-overlay" id="addWorkerModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Naya Worker Jodo 👷</div>
+    <div class="modal-sub">Worker ki details bharo</div>
+    <div class="form-group">
+      <div class="form-label">Naam</div>
+      <input class="form-input" id="wName" placeholder="Jaise — Ramesh Sharma" style="margin-bottom:0">
+    </div>
+    <div class="form-group">
+      <div class="form-label">Mobile Number</div>
+      <input class="form-input" id="wMobile" placeholder="+91 94250 XXXXX" type="tel" style="margin-bottom:0">
+    </div>
+    <div class="form-group">
+      <div class="form-label">Telegram Chat ID</div>
+      <input class="form-input" id="wTgId" placeholder="Jaise — 8316136174" style="margin-bottom:0">
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">💡 Worker ko @userinfobot pe /start bhejne ko kaho — ID milegi</div>
+    </div>
+    <div class="form-group">
+      <div class="form-label">Zone</div>
+      <select class="form-select" id="wZone">
+        <option value="Zone A">Zone A</option>
+        <option value="Zone B">Zone B</option>
+        <option value="Zone C">Zone C</option>
+      </select>
+    </div>
+    <button class="btn-accent" onclick="saveWorker()">Worker Save Karo ✓</button>
+    <button onclick="closeModal('addWorkerModal')" style="width:100%;padding:14px;background:none;border:none;font-size:14px;color:var(--text-muted);font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer">Cancel</button>
+  </div>
+</div>
+
+<!-- ASSIGN TASK MODAL -->
+<div class="modal-overlay" id="assignModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Task Assign Karo 📋</div>
+    <div class="modal-sub">Worker select karo aur task likho</div>
+    <div class="form-group">
+      <div class="form-label">Worker</div>
+      <select class="form-select" id="assignWorker" onchange="updateTgPreview()"></select>
+    </div>
+    <div class="form-group">
+      <div class="form-label">Task ka Title</div>
+      <input class="form-input" id="taskTitle" placeholder="Jaise — Zone B dustbin khali karo" oninput="updateTgPreview()" style="margin-bottom:0">
+    </div>
+    <div class="form-group">
+      <div class="form-label">Details (optional)</div>
+      <input class="form-input" id="taskDesc" placeholder="Koi extra details..." style="margin-bottom:0">
+    </div>
+    <div class="form-group">
+      <div class="form-label">Zone</div>
+      <select class="form-select" id="taskZone">
+        <option>Zone A</option><option>Zone B</option><option>Zone C</option>
+      </select>
+    </div>
+    <div id="tgPreviewModal" style="display:none;margin-bottom:14px" class="tg-preview-box">
+      <div class="tg-preview-header">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="#0088cc"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+        Telegram pe aisa jayega:
+      </div>
+      <div class="tg-bubble" id="tgPreviewText"></div>
+    </div>
+    <button class="btn-green" onclick="sendTask()" id="sendTaskBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+      Telegram pe Bhejo ✓
+    </button>
+    <button onclick="closeModal('assignModal')" style="width:100%;padding:14px;background:none;border:none;font-size:14px;color:var(--text-muted);font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;margin-top:8px">Cancel</button>
+  </div>
+</div>
+
+<div class="app-shell">
+
+  <!-- SCREEN 1: SPLASH -->
+  <div class="screen active" id="screen-splash">
+    <div class="splash">
+      <div class="splash-emblem">
+        <svg viewBox="0 0 44 44" fill="none">
+          <path d="M22 6L8 14V24C8 31.7 14.3 38.6 22 40C29.7 38.6 36 31.7 36 24V14L22 6Z" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
+          <path d="M22 14L16 18V23C16 27 18.7 30.7 22 32C25.3 30.7 28 27 28 23V18L22 14Z" fill="rgba(255,255,255,0.6)"/>
+          <path d="M20 22L18 24L21 27L26 20" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="splash-org">Nagar Palika · Swachha Bharat</div>
+      <div class="splash-name">Kaam OS</div>
+      <div class="splash-sub">Daily task coordination<br>for your Swachta team</div>
+      <div class="splash-hindi">स्वच्छता सेवा · डिजिटल संचालन</div>
+      <button class="btn-primary" onclick="showScreen('screen-login')">Head Login करें →</button>
+      <button class="btn-ghost">मेरा संस्थान खोजें</button>
+      <div class="splash-footer">Powered by Event OS · v1.0</div>
+    </div>
+  </div>
+
+  <!-- SCREEN 2: LOGIN -->
+  <div class="screen" id="screen-login">
+    <div class="status-bar"><span>9:41</span><span>●●●</span></div>
+    <div class="login-screen">
+      <div class="back-btn" onclick="showScreen('screen-splash')">←</div>
+      <div class="login-heading">Head Login 👋</div>
+      <div class="login-sub">Sirf Supervisor / Head log in karta hai</div>
+      <div style="margin-bottom:8px">
+        <div class="form-label">Aapka Role</div>
+        <div class="role-select">
+          <div class="role-chip active" onclick="selectRole(this,'Supervisor')"><div class="role-icon">🏛️</div>Supervisor</div>
+          <div class="role-chip" onclick="selectRole(this,'Ward Head')"><div class="role-icon">👔</div>Ward Head</div>
+          <div class="role-chip" onclick="selectRole(this,'Officer')"><div class="role-icon">🏢</div>Officer</div>
+        </div>
+      </div>
+      <div class="form-label">Mobile Number</div>
+      <input class="form-input" id="mobileInput" type="tel" placeholder="+91 98765 43210">
+      <div id="otpSection" style="display:none">
+        <div class="form-label">OTP Enter Karo</div>
+        <input class="otp-input" id="otpInput" type="number" placeholder="1234" maxlength="4">
+        <button class="btn-accent" onclick="verifyOTP()">Login Karo ✓</button>
+      </div>
+      <button class="btn-accent" id="otpBtn" onclick="sendOTP()">OTP भेजें → Send OTP</button>
+      <div class="divider"><div class="divider-line"></div><div class="divider-text">ya seedha</div><div class="divider-line"></div></div>
+      <button class="btn-tg" onclick="quickLogin()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="#0088cc"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+        Quick Login (Demo)
+      </button>
+      <div style="margin-top:auto;text-align:center;font-size:12px;color:var(--text-muted)">Swachta Sathi workers ko<br><strong style="color:var(--text-secondary)">app download nahi karna hai</strong> 🙌</div>
+    </div>
+  </div>
+
+  <!-- SCREEN 3: DASHBOARD -->
+  <div class="screen" id="screen-dashboard" style="position:relative">
+    <div class="status-bar" style="background:var(--surface)"><span id="dashTime">9:41</span><span>●●●</span></div>
+    <div class="dashboard">
+      <div class="dash-header">
+        <div class="dash-top">
+          <div>
+            <div class="dash-org">Indore Nagar Palika · Ward 12</div>
+            <div class="dash-title">Aaj ka Kaam</div>
+            <div class="dash-date" id="dashDate">—</div>
+          </div>
+          <div class="avatar-btn" id="supervisorAvatar">RK</div>
+        </div>
+        <div class="stats-row">
+          <div class="stat-chip green" onclick="showScreen('screen-tasks')"><div class="stat-num" id="statDone">—</div><div class="stat-label">Done ✓</div></div>
+          <div class="stat-chip amber" onclick="showScreen('screen-tasks')"><div class="stat-num" id="statPending">—</div><div class="stat-label">Pending</div></div>
+          <div class="stat-chip red"><div class="stat-num" id="statIssues">0</div><div class="stat-label">Issues</div></div>
+          <div class="stat-chip" onclick="showScreen('screen-team')"><div class="stat-num" id="statWorkers">—</div><div class="stat-label">Workers</div></div>
+        </div>
+      </div>
+      <div class="dash-body">
+        <div class="announcement"><div class="ann-icon">📢</div><div><div class="ann-text" id="annText">Loading...</div><div class="ann-time" id="annTime">—</div></div></div>
+        <div>
+          <div class="section-head">
+            <div class="section-title" id="workerCountTitle">Swachta Sathi</div>
+            <div class="section-action" onclick="openModal('assignModal')">+ Task bhejo</div>
+          </div>
+          <div class="worker-list" id="dashWorkerList"><div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px">Loading...</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="fab" onclick="openModal('assignModal')">
+      <svg width="24" height="24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </div>
+    <div class="bottom-nav">
+      <div class="nav-item active" onclick="showScreen('screen-dashboard')"><div class="nav-icon">🏠</div>Home</div>
+      <div class="nav-item" onclick="showScreen('screen-tasks')"><div class="nav-icon">✅</div>Tasks</div>
+      <div class="nav-item" onclick="showScreen('screen-team')"><div class="nav-icon">👥</div>Team</div>
+      <div class="nav-item" onclick="showScreen('screen-broadcast')"><div class="nav-icon">📢</div>Broadcast</div>
+    </div>
+  </div>
+
+  <!-- SCREEN 4: TASKS -->
+  <div class="screen" id="screen-tasks" style="position:relative">
+    <div class="status-bar"><span>9:41</span><span>●●●</span></div>
+    <div class="top-bar">
+      <div class="top-bar-row" style="margin-bottom:10px">
+        <div class="back-btn-sm" onclick="showScreen('screen-dashboard')">←</div>
+        <div><div class="top-title">Aaj ke Tasks</div><div class="top-sub" id="tasksSubtitle">Loading...</div></div>
+        <div style="margin-left:auto;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:7px 10px;font-size:12px;font-weight:600;color:var(--text-secondary);cursor:pointer" onclick="loadTasks()">↻</div>
+      </div>
+      <div class="filter-bar">
+        <div class="filter-chip active" onclick="filterTasks('all',this)">Sab</div>
+        <div class="filter-chip" onclick="filterTasks('done',this)">Done ✓</div>
+        <div class="filter-chip" onclick="filterTasks('pending',this)">Pending</div>
+        <div class="filter-chip" onclick="filterTasks('Zone A',this)">Zone A</div>
+        <div class="filter-chip" onclick="filterTasks('Zone B',this)">Zone B</div>
+        <div class="filter-chip" onclick="filterTasks('Zone C',this)">Zone C</div>
+      </div>
+    </div>
+    <div class="scrollbody" id="tasksList"><div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px">Loading...</div></div>
+    <div class="fab" onclick="openModal('assignModal')">
+      <svg width="22" height="22" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round"><line x1="11" y1="3" x2="11" y2="19"/><line x1="3" y1="11" x2="19" y2="11"/></svg>
+    </div>
+    <div class="bottom-nav">
+      <div class="nav-item" onclick="showScreen('screen-dashboard')"><div class="nav-icon">🏠</div>Home</div>
+      <div class="nav-item active"><div class="nav-icon">✅</div>Tasks</div>
+      <div class="nav-item" onclick="showScreen('screen-team')"><div class="nav-icon">👥</div>Team</div>
+      <div class="nav-item" onclick="showScreen('screen-broadcast')"><div class="nav-icon">📢</div>Broadcast</div>
+    </div>
+  </div>
+
+  <!-- SCREEN 5: TEAM -->
+  <div class="screen" id="screen-team" style="position:relative">
+    <div class="status-bar"><span>9:41</span><span>●●●</span></div>
+    <div class="top-bar">
+      <div class="top-bar-row">
+        <div class="back-btn-sm" onclick="showScreen('screen-dashboard')">←</div>
+        <div><div class="top-title">Swachta Sathi</div><div class="top-sub" id="teamSubtitle">Team</div></div>
+        <div style="margin-left:auto;background:var(--accent);color:white;border-radius:10px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer" onclick="openModal('addWorkerModal')">+ Add</div>
+      </div>
+    </div>
+    <div class="scrollbody" id="teamList"><div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px">Loading...</div></div>
+    <div class="bottom-nav">
+      <div class="nav-item" onclick="showScreen('screen-dashboard')"><div class="nav-icon">🏠</div>Home</div>
+      <div class="nav-item" onclick="showScreen('screen-tasks')"><div class="nav-icon">✅</div>Tasks</div>
+      <div class="nav-item active"><div class="nav-icon">👥</div>Team</div>
+      <div class="nav-item" onclick="showScreen('screen-broadcast')"><div class="nav-icon">📢</div>Broadcast</div>
+    </div>
+  </div>
+
+  <!-- SCREEN 6: BROADCAST -->
+  <div class="screen" id="screen-broadcast" style="position:relative">
+    <div class="status-bar"><span>9:41</span><span>●●●</span></div>
+    <div class="top-bar">
+      <div class="top-bar-row">
+        <div class="back-btn-sm" onclick="showScreen('screen-dashboard')">←</div>
+        <div><div class="top-title">Broadcast</div><div class="top-sub">Telegram pe bhejo sabko</div></div>
+      </div>
+    </div>
+    <div class="scrollbody">
+      <div>
+        <div class="section-head"><div class="section-title">Kisko bhejoge?</div></div>
+        <div class="audience-grid">
+          <div class="audience-card selected" id="aud-all" onclick="selectAudience('all')"><div class="audience-icon">👥</div><div class="audience-label">Sabko</div><div class="audience-count" id="audAllCount">— workers</div></div>
+          <div class="audience-card" id="aud-a" onclick="selectAudience('Zone A')"><div class="audience-icon">📍</div><div class="audience-label">Zone A sirf</div><div class="audience-count" id="audACount">—</div></div>
+          <div class="audience-card" id="aud-b" onclick="selectAudience('Zone B')"><div class="audience-icon">📍</div><div class="audience-label">Zone B sirf</div><div class="audience-count" id="audBCount">—</div></div>
+          <div class="audience-card" id="aud-c" onclick="selectAudience('Zone C')"><div class="audience-icon">📍</div><div class="audience-label">Zone C sirf</div><div class="audience-count" id="audCCount">—</div></div>
+        </div>
+      </div>
+      <div>
+        <div class="section-head"><div class="section-title">Quick Templates</div></div>
+        <div class="quick-template">
+          <div class="tmpl-chip" onclick="setTemplate('📢 Aaj collector inspection hai. Apna zone saaf karo aur photo bhejo!')">📢 Inspection aaj</div>
+          <div class="tmpl-chip" onclick="setTemplate('⏰ Jaldi karo! Kaam abhi khatam karo.')">⏰ Jaldi karo</div>
+          <div class="tmpl-chip" onclick="setTemplate('✅ Kaam ho gaya? Reply karo DONE.')">✅ Ho gaya?</div>
+          <div class="tmpl-chip" onclick="setTemplate('🚛 Truck aa raha hai — ready raho.')">🚛 Truck</div>
+        </div>
+      </div>
+      <div class="message-box">
+        <div class="message-label">Aapka message</div>
+        <textarea class="message-textarea" id="broadcastMsg" placeholder="Yahan likho..." oninput="document.getElementById('broadcastPreview').textContent=this.value"></textarea>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
+          <span style="font-size:11px;color:var(--text-muted)">Hindi / English dono chalega</span>
+          <span style="font-size:11px;font-weight:600;color:var(--accent)" id="broadcastCount">—</span>
+        </div>
+      </div>
+      <div class="tg-preview-box">
+        <div class="tg-preview-header">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="#0088cc"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+          Telegram Preview:
+        </div>
+        <div class="tg-bubble" id="broadcastPreview">Message yahan dikhega...</div>
+        <div class="tg-meta">Indore Nagar Palika</div>
+      </div>
+      <button class="btn-full" onclick="sendBroadcast()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+        <span id="broadcastBtnText">Sabko Bhejo ✓</span>
+      </button>
+    </div>
+    <div class="bottom-nav">
+      <div class="nav-item" onclick="showScreen('screen-dashboard')"><div class="nav-icon">🏠</div>Home</div>
+      <div class="nav-item" onclick="showScreen('screen-tasks')"><div class="nav-icon">✅</div>Tasks</div>
+      <div class="nav-item" onclick="showScreen('screen-team')"><div class="nav-icon">👥</div>Team</div>
+      <div class="nav-item active"><div class="nav-icon">📢</div>Broadcast</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const SUPABASE_URL = 'https://brumruyywhqkjvgzljyu.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJydW1ydXl5d2hxa2p2Z3psanl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxNzAzNzIsImV4cCI6MjA4OTc0NjM3Mn0.Qlh7GrThWQyyOm1wqM7tO3ZMmIudOFtRLDv19cbZ4Lg';
+const N8N_WEBHOOK = 'https://kaamos.app.n8n.cloud/webhook/task-assignment';
+const TG_BOT = '8628777087:AAHEMA5guwwm62k3K4LJm-caqgIvlmuX4dE';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let state = { supervisor: null, workers: [], tasks: [], audience: 'all', role: 'Supervisor' };
+
+// ── HELPERS ──
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  const loads = { 'screen-dashboard': loadDashboard, 'screen-tasks': loadTasks, 'screen-team': loadTeam, 'screen-broadcast': loadBroadcast };
+  if (loads[id]) loads[id]();
+}
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+function loader(show) { document.getElementById('loader').classList.toggle('show', show); }
+function openModal(id) { document.getElementById(id).classList.add('show'); if (id === 'assignModal') fillWorkerSelect(); }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+function selectRole(el, r) { document.querySelectorAll('.role-chip').forEach(c => c.classList.remove('active')); el.classList.add('active'); state.role = r; }
+
+// ── CLOCK ──
+function tick() {
+  const t = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const el = document.getElementById('dashTime'); if (el) el.textContent = t;
+}
+setInterval(tick, 30000); tick();
+
+// ── LOGIN ──
+function sendOTP() {
+  const m = document.getElementById('mobileInput').value.trim();
+  if (m.length < 10) { toast('⚠️ Sahi mobile number daalo'); return; }
+  document.getElementById('otpSection').style.display = 'block';
+  document.getElementById('otpBtn').style.display = 'none';
+  toast('✅ OTP bheja gaya — test mein 1234 use karo');
+}
+function verifyOTP() {
+  const otp = document.getElementById('otpInput').value.trim();
+  if (otp === '1234' || otp.length === 4) { doLogin(); }
+  else { toast('❌ Wrong OTP — 1234 try karo'); }
+}
+function quickLogin() { doLogin(); }
+function doLogin() {
+  state.supervisor = { name: 'Rajesh Kumar', role: state.role };
+  showScreen('screen-dashboard');
+  toast('✅ Login ho gaya! Namaste Rajesh Sir 🙏');
+}
+
+// ── DASHBOARD ──
+async function loadDashboard() {
+  const d = new Date();
+  const days = ['Ravivar','Somvar','Mangalvar','Budhvar','Guruvar','Shukravar','Shanivaar'];
+  const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('dashDate').textContent = `${days[d.getDay()]}, ${d.getDate()} ${mo[d.getMonth()]} ${d.getFullYear()}`;
+
+  const [{ data: workers }, { data: tasks }] = await Promise.all([
+    sb.from('workers').select('*').eq('is_active', true),
+    sb.from('tasks').select('*')
+  ]);
+
+  if (workers) {
+    state.workers = workers;
+    document.getElementById('statWorkers').textContent = workers.length;
+    document.getElementById('workerCountTitle').textContent = `Swachta Sathi (${workers.length})`;
+    const list = document.getElementById('dashWorkerList');
+    if (!workers.length) {
+      list.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">Koi worker nahi — Team tab mein add karo 👥</div>`;
+    } else {
+      list.innerHTML = workers.map(w => {
+        const init = w.name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase();
+        const hasTg = !!w.telegram_chat_id;
+        return `<div class="worker-card" onclick="openAssignFor('${w.id}')">
+          <div class="worker-avatar" style="background:#D8EDDF;color:#1B4332">${init}<div class="online-dot ${hasTg?'done':'idle'}"></div></div>
+          <div class="worker-info"><div class="worker-name">${w.name}</div><div class="worker-zone">${w.zone}</div></div>
+          <div class="worker-right"><div class="tg-badge"><div class="tg-dot" style="background:${hasTg?'var(--tg)':'#CBD5E1'}"></div>${hasTg?'Telegram ✓':'No Telegram'}</div></div>
+        </div>`;
+      }).join('');
+    }
+  }
+
+  if (tasks) {
+    state.tasks = tasks;
+    document.getElementById('statDone').textContent = tasks.filter(t=>t.status==='done').length;
+    document.getElementById('statPending').textContent = tasks.filter(t=>t.status==='pending').length;
+  }
+
+  document.getElementById('annText').textContent = 'Task assign karo — workers ko Telegram pe jayega!';
+  document.getElementById('annTime').textContent = `${new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})} · Kaam OS`;
+}
+
+// ── TASKS ──
+let allTasks = [];
+async function loadTasks() {
+  const { data, error } = await sb.from('tasks').select('*, workers(name, zone, telegram_chat_id)').order('created_at', { ascending: false });
+  if (error) { toast('❌ Tasks load nahi hua'); return; }
+  allTasks = data || [];
+  document.getElementById('tasksSubtitle').textContent = `${allTasks.length} tasks total aaj`;
+  renderTasks(allTasks);
+}
+function renderTasks(tasks) {
+  const el = document.getElementById('tasksList');
+  if (!tasks.length) {
+    el.innerHTML = `<div style="text-align:center;padding:30px;color:var(--text-muted);font-size:13px">Koi task nahi abhi<br><br><button onclick="openModal('assignModal')" style="background:var(--accent);color:white;border:none;border-radius:10px;padding:10px 20px;font-size:13px;font-weight:600;font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer">+ Pehla Task Bhejo</button></div>`;
+    return;
+  }
+  const pending = tasks.filter(t=>t.status==='pending');
+  const done = tasks.filter(t=>t.status==='done');
+  let h = '';
+  if (pending.length) {
+    h += `<div class="section-head"><div class="section-title">Pending (${pending.length})</div><div class="section-action" onclick="sendReminders()">⏰ Reminder bhejo</div></div>`;
+    h += pending.map(t => taskCard(t)).join('');
+  }
+  if (done.length) {
+    h += `<div class="section-head" style="margin-top:4px"><div class="section-title">Done ✓ (${done.length})</div></div>`;
+    h += done.map(t => taskCard(t, true)).join('');
+  }
+  el.innerHTML = h;
+}
+function taskCard(t, faded=false) {
+  const wn = t.workers?.name || '—'; const wz = t.workers?.zone || t.zone || '';
+  const init = wn.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase();
+  const tm = new Date(t.created_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+  const old = (new Date() - new Date(t.created_at)) > 7200000;
+  const crit = t.status==='pending' && old;
+  return `<div class="task-card ${crit?'critical':''}" style="${faded?'opacity:.75':''}">
+    <div class="task-card-top">
+      <div><div class="task-card-title">${t.title}</div>
+        <div class="task-card-meta"><span class="zone-chip">${wz}</span><div style="display:flex;align-items:center;gap:4px"><div class="mini-avatar">${init}</div><span style="font-size:12px;color:var(--text-secondary)">${wn}</span></div></div>
+      </div>
+      <span class="status-pill ${t.status==='done'?'pill-done':crit?'pill-critical':'pill-pending'}">${t.status==='done'?'✓ Done':crit?'Critical':'Pending'}</span>
+    </div>
+    <div class="task-card-bottom">
+      <span class="task-time">Assigned ${tm}</span>
+      ${t.status==='done'?'<div class="tg-reply"><div class="tg-dot-sm"></div>DONE reply</div>':crit?'<span style="font-size:11px;color:var(--red)">⚠ No reply 2h+</span>':'<span class="no-reply">No reply yet</span>'}
+    </div>
+  </div>`;
+}
+function filterTasks(type, el) {
+  document.querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active')); el.classList.add('active');
+  if (type==='all') renderTasks(allTasks);
+  else if (type==='done') renderTasks(allTasks.filter(t=>t.status==='done'));
+  else if (type==='pending') renderTasks(allTasks.filter(t=>t.status==='pending'));
+  else renderTasks(allTasks.filter(t=>t.zone===type || t.workers?.zone===type));
+}
+async function sendReminders() {
+  const pending = allTasks.filter(t=>t.status==='pending' && t.workers?.telegram_chat_id);
+  if (!pending.length) { toast('⚠️ Koi pending + Telegram worker nahi'); return; }
+  loader(true);
+  for (const t of pending) {
+    await tgSend(t.workers.telegram_chat_id, `⏰ *Reminder!*\n\n📋 ${t.title}\n\nAbhi bhi pending hai. Reply karo *DONE* jab ho jaye.\n\n— Rajesh Sir`);
+  }
+  loader(false);
+  toast(`✅ ${pending.length} workers ko reminder bheja!`);
+}
+
+// ── TEAM ──
+async function loadTeam() {
+  const { data: workers } = await sb.from('workers').select('*').eq('is_active', true).order('zone');
+  if (!workers) return;
+  state.workers = workers;
+  document.getElementById('teamSubtitle').textContent = `${workers.length} workers active`;
+  const el = document.getElementById('teamList');
+  if (!workers.length) {
+    el.innerHTML = `<div style="text-align:center;padding:30px;color:var(--text-muted);font-size:13px">Koi worker nahi<br><br><button onclick="openModal('addWorkerModal')" style="background:var(--accent);color:white;border:none;border-radius:10px;padding:10px 20px;font-size:13px;font-weight:600;font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer">+ Pehla Worker Add Karo</button></div>`;
+    return;
+  }
+  el.innerHTML = workers.map(w => {
+    const init = w.name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase();
+    const hasTg = !!w.telegram_chat_id;
+    return `<div class="worker-card-full">
+      <div class="worker-avatar-lg" style="background:#D8EDDF;color:#1B4332">${init}
+        <div style="position:absolute;bottom:-2px;right:-2px;width:11px;height:11px;border-radius:50%;border:2px solid white;background:${hasTg?'var(--accent)':'#CBD5E1'}"></div>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:700;color:var(--text-primary)">${w.name}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:1px">${w.zone} · ${w.mobile||'—'}</div>
+        <div style="font-size:11px;color:${hasTg?'var(--tg-dark)':'var(--text-muted)'};margin-top:2px">${hasTg?'✓ Telegram connected':'No Telegram ID'}</div>
+      </div>
+      <button onclick="openAssignFor('${w.id}')" style="background:var(--accent-light);color:var(--accent-text);border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif">📋 Task</button>
+    </div>`;
+  }).join('');
+}
+
+async function saveWorker() {
+  const name = document.getElementById('wName').value.trim();
+  const mobile = document.getElementById('wMobile').value.trim();
+  const tgId = document.getElementById('wTgId').value.trim();
+  const zone = document.getElementById('wZone').value;
+  if (!name || !mobile) { toast('⚠️ Naam aur mobile zaroori hai'); return; }
+  loader(true);
+  const { error } = await sb.from('workers').insert({ name, mobile, telegram_chat_id: tgId||null, zone });
+  loader(false);
+  if (error) { toast('❌ ' + error.message); return; }
+  closeModal('addWorkerModal');
+  ['wName','wMobile','wTgId'].forEach(id => document.getElementById(id).value='');
+  toast(`✅ ${name} add ho gaya!`);
+  await loadTeam();
+  const { data: w } = await sb.from('workers').select('*').eq('is_active',true);
+  if (w) state.workers = w;
+}
+
+// ── ASSIGN TASK ──
+function fillWorkerSelect() {
+  const sel = document.getElementById('assignWorker');
+  sel.innerHTML = state.workers.length
+    ? state.workers.map(w=>`<option value="${w.id}" data-name="${w.name}" data-tg="${w.telegram_chat_id||''}" data-zone="${w.zone}">${w.name} — ${w.zone}${w.telegram_chat_id?' ✓':' (No TG)'}</option>`).join('')
+    : '<option value="">Pehle worker add karo (Team tab)</option>';
+  updateTgPreview();
+}
+function openAssignFor(wid) {
+  openModal('assignModal');
+  setTimeout(() => { document.getElementById('assignWorker').value = wid; updateTgPreview(); }, 100);
+}
+function updateTgPreview() {
+  const sel = document.getElementById('assignWorker');
+  const title = document.getElementById('taskTitle').value.trim();
+  if (!sel?.selectedOptions[0]) return;
+  const opt = sel.selectedOptions[0];
+  const hasTg = opt.dataset.tg;
+  const prev = document.getElementById('tgPreviewModal');
+  if (title && hasTg) {
+    prev.style.display = 'block';
+    document.getElementById('tgPreviewText').innerHTML = `🔔 *Naya Task — ${opt.dataset.zone}*<br><br>📋 ${title}<br><br>✅ Ho jaye to reply karo: *DONE*<br>📸 Photo bhi bhejo proof ke liye<br><br>— Rajesh Sir`;
+  } else { prev.style.display = 'none'; }
+}
+async function sendTask() {
+  const sel = document.getElementById('assignWorker');
+  const title = document.getElementById('taskTitle').value.trim();
+  const desc = document.getElementById('taskDesc').value.trim();
+  const zone = document.getElementById('taskZone').value;
+  if (!title) { toast('⚠️ Task title zaroori hai'); return; }
+  if (!sel?.selectedOptions[0]?.value) { toast('⚠️ Worker select karo'); return; }
+  const opt = sel.selectedOptions[0];
+  const wId = sel.value; const wName = opt.dataset.name; const tgId = opt.dataset.tg;
+  loader(true);
+  document.getElementById('sendTaskBtn').disabled = true;
+
+  const { error } = await sb.from('tasks').insert({ title, description: desc, zone, assigned_to: wId, status: 'pending' });
+  if (error) { loader(false); document.getElementById('sendTaskBtn').disabled=false; toast('❌ '+error.message); return; }
+
+  if (tgId) {
+    const msg = `🔔 *Naya Task — ${zone}*\n\nWorker: ${wName}\n📋 ${title}${desc?'\n'+desc:''}\n\n✅ Ho jaye to reply karo: *DONE*\n📸 Photo bhi bhejo proof ke liye\n\n— Rajesh Sir (Supervisor)`;
+    try {
+      const r = await fetch(N8N_WEBHOOK, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ title, description:desc, zone, worker_name:wName, worker_telegram_id:tgId }) });
+      if (!r.ok) throw new Error();
+    } catch { await tgSend(tgId, msg); }
+  }
+
+  loader(false);
+  document.getElementById('sendTaskBtn').disabled = false;
+  closeModal('assignModal');
+  document.getElementById('taskTitle').value = '';
+  document.getElementById('taskDesc').value = '';
+  toast(tgId ? `✅ Task assign hua! ${wName} ko Telegram pe gaya 🚀` : `✅ Task save hua (Telegram ID nahi tha)`);
+  loadDashboard();
+}
+
+// ── BROADCAST ──
+function loadBroadcast() {
+  const w = state.workers;
+  document.getElementById('audAllCount').textContent = `${w.length} workers`;
+  document.getElementById('audACount').textContent = `${w.filter(x=>x.zone==='Zone A').length} workers`;
+  document.getElementById('audBCount').textContent = `${w.filter(x=>x.zone==='Zone B').length} workers`;
+  document.getElementById('audCCount').textContent = `${w.filter(x=>x.zone==='Zone C').length} workers`;
+  document.getElementById('broadcastCount').textContent = `${w.length} log milenge`;
+}
+function selectAudience(type) {
+  state.audience = type;
+  document.querySelectorAll('.audience-card').forEach(c=>c.classList.remove('selected'));
+  const map = {'all':'aud-all','Zone A':'aud-a','Zone B':'aud-b','Zone C':'aud-c'};
+  document.getElementById(map[type]||'aud-all').classList.add('selected');
+  const cnt = type==='all' ? state.workers.length : state.workers.filter(w=>w.zone===type).length;
+  document.getElementById('broadcastCount').textContent = `${cnt} log milenge`;
+  document.getElementById('broadcastBtnText').textContent = `${cnt} logon ko Bhejo ✓`;
+}
+function setTemplate(msg) {
+  document.getElementById('broadcastMsg').value = msg;
+  document.getElementById('broadcastPreview').textContent = msg;
+}
+async function sendBroadcast() {
+  const msg = document.getElementById('broadcastMsg').value.trim();
+  if (!msg) { toast('⚠️ Message likho pehle'); return; }
+  let targets = state.workers.filter(w=>w.telegram_chat_id);
+  if (state.audience !== 'all') targets = targets.filter(w=>w.zone===state.audience);
+  if (!targets.length) { toast('⚠️ Koi Telegram ID nahi hai in workers ka'); return; }
+  loader(true);
+  for (const w of targets) await tgSend(w.telegram_chat_id, msg);
+  loader(false);
+  toast(`✅ ${targets.length} workers ko message bheja! 📨`);
+  document.getElementById('broadcastMsg').value = '';
+}
+
+// ── TELEGRAM DIRECT ──
+async function tgSend(chatId, text) {
+  try {
+    await fetch(`https://api.telegram.org/bot${TG_BOT}/sendMessage`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ chat_id: chatId, text, parse_mode:'Markdown' })
+    });
+  } catch(e) { console.error('TG error', e); }
+}
+
+// ── INIT ──
+window.addEventListener('click', e => { if (e.target.classList.contains('modal-overlay')) e.target.classList.remove('show'); });
+(async () => {
+  const { data } = await sb.from('workers').select('*').eq('is_active',true);
+  if (data) state.workers = data;
+})();
+</script>
+</body>
+</html>
