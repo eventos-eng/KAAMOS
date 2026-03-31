@@ -231,7 +231,12 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: #DDD9D0; min-he
     </div>
     <div class="form-group">
       <div class="form-label">Task ka Title</div>
-      <input class="form-input" id="taskTitle" placeholder="Jaise — Zone B dustbin khali karo" oninput="updateTgPreview()" style="margin-bottom:0">
+      <input class="form-input" id="taskTitle" placeholder="Jaise — dustbin saaf karo zone b" oninput="updateTgPreview()" style="margin-bottom:0">
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button onclick="aiRefineTask()" style="flex:1;padding:10px;background:#EDE9FE;color:#5B21B6;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:6px">✨ AI se Refine Karo</button>
+        <button onclick="aiTranslate()" style="flex:1;padding:10px;background:#E8F4FD;color:var(--tg-dark);border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:6px">🌐 Hindi ↔ English</button>
+      </div>
+      <div id="aiStatus" style="display:none;font-size:11px;color:#5B21B6;margin-top:6px;padding:8px 12px;background:#EDE9FE;border-radius:8px">✨ AI soch raha hai...</div>
     </div>
     <div class="form-group">
       <div class="form-label">Details (optional)</div>
@@ -434,10 +439,12 @@ body { font-family: 'Plus Jakarta Sans', sans-serif; background: #DDD9D0; min-he
       <div class="message-box">
         <div class="message-label">Aapka message</div>
         <textarea class="message-textarea" id="broadcastMsg" placeholder="Yahan likho..." oninput="document.getElementById('broadcastPreview').textContent=this.value"></textarea>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
-          <span style="font-size:11px;color:var(--text-muted)">Hindi / English dono chalega</span>
-          <span style="font-size:11px;font-weight:600;color:var(--accent)" id="broadcastCount">—</span>
+        <div style="display:flex;gap:8px;margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
+          <button onclick="aiBroadcastRefine()" style="flex:1;padding:9px;background:#EDE9FE;color:#5B21B6;border:none;border-radius:10px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif">✨ AI Refine</button>
+          <button onclick="aiBroadcastTranslate()" style="flex:1;padding:9px;background:#E8F4FD;color:var(--tg-dark);border:none;border-radius:10px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif">🌐 Translate</button>
+          <span style="font-size:11px;font-weight:600;color:var(--accent);display:flex;align-items:center" id="broadcastCount">—</span>
         </div>
+        <div id="broadcastAiStatus" style="display:none;font-size:11px;color:#5B21B6;margin-top:6px;padding:8px 12px;background:#EDE9FE;border-radius:8px">✨ AI soch raha hai...</div>
       </div>
       <div class="tg-preview-box">
         <div class="tg-preview-header">
@@ -467,6 +474,8 @@ const SUPABASE_URL = 'https://brumruyywhqkjvgzljyu.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJydW1ydXl5d2hxa2p2Z3psanl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxNzAzNzIsImV4cCI6MjA4OTc0NjM3Mn0.Qlh7GrThWQyyOm1wqM7tO3ZMmIudOFtRLDv19cbZ4Lg';
 const N8N_WEBHOOK = 'https://kaamos.app.n8n.cloud/webhook/task-assignment';
 const TG_BOT = '8628777087:AAHEMA5guwwm62k3K4LJm-caqgIvlmuX4dE';
+const GROQ_KEY = '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';
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let state = { supervisor: null, workers: [], tasks: [], audience: 'all', role: 'Supervisor' };
@@ -757,6 +766,103 @@ async function sendBroadcast() {
   loader(false);
   toast(`✅ ${targets.length} workers ko message bheja! 📨`);
   document.getElementById('broadcastMsg').value = '';
+}
+
+// ── GROQ AI ──
+async function groqCall(systemPrompt, userMsg) {
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
+    body: JSON.stringify({
+      model: 'llama3-8b-8192',
+      messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userMsg }],
+      max_tokens: 200, temperature: 0.7
+    })
+  });
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content?.trim() || '';
+}
+
+async function aiRefineTask() {
+  const title = document.getElementById('taskTitle').value.trim();
+  if (!title) { toast('⚠️ Pehle task likho'); return; }
+  const sel = document.getElementById('assignWorker');
+  const zone = sel?.selectedOptions[0]?.dataset?.zone || document.getElementById('taskZone').value;
+  const status = document.getElementById('aiStatus');
+  status.style.display = 'block';
+  status.textContent = '✨ AI refine kar raha hai...';
+  try {
+    const refined = await groqCall(
+      `You are a task manager for a municipal sanitation team in India. 
+      Convert the rough command into a clear, professional task instruction in the SAME language as input (Hindi or English).
+      Keep it short — max 1 sentence. Add relevant emoji. Include zone if mentioned.
+      Output ONLY the refined task, nothing else.`,
+      `Raw command: "${title}" for ${zone}`
+    );
+    document.getElementById('taskTitle').value = refined;
+    status.textContent = '✅ AI ne refine kar diya!';
+    setTimeout(() => { status.style.display = 'none'; }, 2000);
+    updateTgPreview();
+  } catch(e) {
+    status.style.display = 'none';
+    toast('❌ AI error — retry karo');
+  }
+}
+
+async function aiTranslate() {
+  const title = document.getElementById('taskTitle').value.trim();
+  if (!title) { toast('⚠️ Pehle task likho'); return; }
+  const status = document.getElementById('aiStatus');
+  status.style.display = 'block';
+  status.textContent = '🌐 Translate ho raha hai...';
+  try {
+    const translated = await groqCall(
+      `You are a translator. Detect if the text is Hindi or English.
+      If Hindi → translate to English. If English → translate to Hindi.
+      Output ONLY the translated text, nothing else. Keep it natural and simple.`,
+      title
+    );
+    document.getElementById('taskTitle').value = translated;
+    status.textContent = '✅ Translation ho gaya!';
+    setTimeout(() => { status.style.display = 'none'; }, 2000);
+    updateTgPreview();
+  } catch(e) {
+    status.style.display = 'none';
+    toast('❌ Translation error — retry karo');
+  }
+}
+
+async function aiBroadcastRefine() {
+  const msg = document.getElementById('broadcastMsg').value.trim();
+  if (!msg) { toast('⚠️ Pehle message likho'); return; }
+  const status = document.getElementById('broadcastAiStatus');
+  status.style.display = 'block'; status.textContent = '✨ AI refine kar raha hai...';
+  try {
+    const refined = await groqCall(
+      `You are a supervisor in a municipal sanitation team in India.
+      Refine this broadcast message to be clear, professional and motivating.
+      Keep the SAME language (Hindi or English). Keep it short. Add relevant emoji.
+      Output ONLY the refined message, nothing else.`, msg);
+    document.getElementById('broadcastMsg').value = refined;
+    document.getElementById('broadcastPreview').textContent = refined;
+    status.textContent = '✅ Refine ho gaya!';
+    setTimeout(() => { status.style.display = 'none'; }, 2000);
+  } catch(e) { status.style.display = 'none'; toast('❌ AI error'); }
+}
+
+async function aiBroadcastTranslate() {
+  const msg = document.getElementById('broadcastMsg').value.trim();
+  if (!msg) { toast('⚠️ Pehle message likho'); return; }
+  const status = document.getElementById('broadcastAiStatus');
+  status.style.display = 'block'; status.textContent = '🌐 Translate ho raha hai...';
+  try {
+    const translated = await groqCall(
+      `Translator: If Hindi → English. If English → Hindi. Output ONLY translated text.`, msg);
+    document.getElementById('broadcastMsg').value = translated;
+    document.getElementById('broadcastPreview').textContent = translated;
+    status.textContent = '✅ Translation ho gaya!';
+    setTimeout(() => { status.style.display = 'none'; }, 2000);
+  } catch(e) { status.style.display = 'none'; toast('❌ Translation error'); }
 }
 
 // ── TELEGRAM DIRECT ──
